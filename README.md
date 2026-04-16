@@ -2,7 +2,7 @@
 
 Исходный репозиторий: [github.com/maksim994/wiki](https://github.com/maksim994/wiki).
 
-Self-hosted wiki: роли **Admin / Editor / Viewer**, пространства **space**, дерево страниц, JSON-блоки контента (MVP), версии страниц, комментарии, публикация по публичной ссылке `/pub/:token`.
+Self-hosted wiki: роли **Admin / Editor / Viewer**, пространства **space**, дерево страниц, **блочный редактор [BlockNote](https://www.blocknotejs.org/)** (стиль Notion: `/`, списки, заголовки и т.д.), поиск по странице внутри space, версии страниц, комментарии, публикация по публичной ссылке `/pub/:token`.
 
 ## Быстрый старт (Docker)
 
