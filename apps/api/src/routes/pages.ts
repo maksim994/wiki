@@ -216,6 +216,9 @@ export async function pagesRoutes(app: FastifyInstance) {
     const page = await prisma.page.update({
       where: { id },
       data: data as Prisma.PageUpdateInput,
+      include: {
+        updatedBy: { select: { id: true, email: true } },
+      },
     });
 
     if (parsed.data.content !== undefined) {
@@ -237,7 +240,15 @@ export async function pagesRoutes(app: FastifyInstance) {
 
     await audit('page.updated', 'Page', id, uid, {});
 
-    return { page };
+    return {
+      page: {
+        id: page.id,
+        content: page.content,
+        contentVersion: page.contentVersion,
+        updatedAt: page.updatedAt,
+        updatedBy: page.updatedBy,
+      },
+    };
   });
 
   app.delete('/api/v1/pages/:id', { preHandler: [app.authenticate] }, async (req, reply) => {

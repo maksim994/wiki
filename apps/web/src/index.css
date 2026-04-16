@@ -517,6 +517,51 @@ a.card.card--interactive:hover {
   font-size: 1.2rem;
 }
 
+.shortcuts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.shortcuts-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.shortcuts-list__keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.shortcuts-list .kbd {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.page-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: -0.15rem 0 0.85rem;
+}
+
 .modal-lead {
   margin: 0 0 1rem;
   font-size: 0.9rem;

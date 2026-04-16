@@ -4,6 +4,7 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { api, apiJson, ApiError } from '../api';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PageVersionsPanel } from '../components/PageVersionsPanel';
+import { ShortcutsModal } from '../components/ShortcutsModal';
 import { useToast } from '../components/ToastProvider';
 import { useAuth } from '../AuthContext';
 import { addRecentPage } from '../lib/recentPages';
@@ -23,6 +24,8 @@ type PagePayload = {
     content: unknown;
     contentVersion: number;
     updatedAt: string;
+    createdBy: { id: string; email: string };
+    updatedBy: { id: string; email: string };
     canEdit: boolean;
     canComment: boolean;
     publicShare?: { enabled: boolean; token: string } | null;
@@ -35,6 +38,7 @@ type PatchPage = {
   content: unknown;
   contentVersion: number;
   updatedAt: string;
+  updatedBy: { id: string; email: string };
 };
 
 const VISIBILITY: Record<
@@ -63,6 +67,7 @@ export function PageScreen() {
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [publicModal, setPublicModal] = useState<'enable' | 'disable' | null>(null);
   const [publicBusy, setPublicBusy] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!pageId) return;
@@ -134,6 +139,7 @@ export function PageScreen() {
                 contentVersion: res.page.contentVersion,
                 content: res.page.content,
                 updatedAt: res.page.updatedAt,
+                updatedBy: res.page.updatedBy,
               },
             }
           : prev,
@@ -191,6 +197,20 @@ export function PageScreen() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [edit, data?.page.canEdit, save]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '?') return;
+      if (shortcutsOpen) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable) return;
+      e.preventDefault();
+      setShortcutsOpen(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shortcutsOpen]);
 
   async function cancelEdit() {
     setEdit(false);
@@ -279,6 +299,15 @@ export function PageScreen() {
           </span>
         </nav>
         <div className="row">
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            title="Горячие клавиши (?)"
+            aria-label="Справка по горячим клавишам"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            ?
+          </button>
           {edit && p.canEdit && (
             <span className="muted" style={{ fontSize: '0.85rem' }}>
               {autosaveState === 'saving' && 'Сохранение…'}
@@ -314,6 +343,15 @@ export function PageScreen() {
       <h1 className="page-title" style={{ marginBottom: '0.65rem' }}>
         {p.title}
       </h1>
+      <p className="page-meta">
+        Обновлено {new Date(p.updatedAt).toLocaleString()} · {p.updatedBy.email}
+        {p.createdBy.id !== p.updatedBy.id ? (
+          <>
+            {' '}
+            · создатель: {p.createdBy.email}
+          </>
+        ) : null}
+      </p>
       <div className="row" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
         <span className={vis.pill}>{vis.short}</span>
         <span className="muted" style={{ fontSize: '0.85rem' }}>
@@ -347,6 +385,8 @@ export function PageScreen() {
           </button>
         </div>
       )}
+
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <ConfirmModal
         open={publicModal === 'enable'}
