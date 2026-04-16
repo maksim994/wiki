@@ -1,3 +1,4 @@
+import { useFocusTrap } from '@mantine/hooks';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, apiJson } from '../api';
@@ -30,10 +31,30 @@ export function SpaceLayout() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileDrawer, setMobileDrawer] = useState(false);
+
+  const sidebarFocusTrapRef = useFocusTrap(sidebarOpen && mobileDrawer);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const sync = () => setMobileDrawer(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!sidebarOpen || !mobileDrawer) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sidebarOpen, mobileDrawer]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -165,7 +186,14 @@ export function SpaceLayout() {
         onClick={() => setSidebarOpen(false)}
       />
       <div className="main space-split">
-        <aside id="space-sidebar" className="card space-sidebar">
+        <aside
+          id="space-sidebar"
+          ref={sidebarFocusTrapRef}
+          className="card space-sidebar"
+          role={mobileDrawer ? 'dialog' : undefined}
+          aria-modal={mobileDrawer && sidebarOpen ? true : undefined}
+          aria-label={mobileDrawer ? 'Страницы пространства' : undefined}
+        >
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <span className="section-title" style={{ margin: 0 }}>
               Страницы

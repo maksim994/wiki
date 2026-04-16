@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, apiJson } from '../api';
+import { ConfirmModal } from './ConfirmModal';
 import { TextDiff } from './TextDiff';
+import { useToast } from './ToastProvider';
 
 type Ver = {
   version: number;
@@ -23,6 +25,7 @@ export function PageVersionsPanel({
   canRestore: boolean;
   onRestored: () => void;
 }) {
+  const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<Ver[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +34,8 @@ export function PageVersionsPanel({
   const [toV, setToV] = useState<number>(0);
   const [compareData, setCompareData] = useState<ComparePayload | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [restoreVersion, setRestoreVersion] = useState<number | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -59,14 +64,22 @@ export function PageVersionsPanel({
     };
   }, [open, pageId]);
 
-  async function restore(version: number) {
-    if (!canRestore) return;
-    if (!window.confirm(`Восстановить версию ${version}? Текущее содержимое станет новой версией в истории.`)) return;
-    await apiJson(`/api/v1/pages/${pageId}/versions/${version}/restore`, {}, 'POST');
-    onRestored();
-    setOpen(false);
-    setCompareOpen(false);
-    setCompareData(null);
+  async function confirmRestore() {
+    if (!canRestore || restoreVersion == null) return;
+    setRestoreBusy(true);
+    try {
+      await apiJson(`/api/v1/pages/${pageId}/versions/${restoreVersion}/restore`, {}, 'POST');
+      onRestored();
+      setOpen(false);
+      setCompareOpen(false);
+      setCompareData(null);
+      setRestoreVersion(null);
+      showToast('Страница откатана к выбранной версии', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Не удалось восстановить версию', 'error');
+    } finally {
+      setRestoreBusy(false);
+    }
   }
 
   async function loadCompare() {
@@ -163,7 +176,7 @@ export function PageVersionsPanel({
                     </td>
                     {canRestore ? (
                       <td style={{ padding: '0.4rem 0.35rem', borderBottom: '1px solid var(--border)' }}>
-                        <button className="btn btn-sm" type="button" onClick={() => void restore(v.version)}>
+                        <button className="btn btn-sm" type="button" onClick={() => setRestoreVersion(v.version)}>
                           Откатить сюда
                         </button>
                       </td>
@@ -175,6 +188,20 @@ export function PageVersionsPanel({
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={restoreVersion != null}
+        title={restoreVersion != null ? `Откатить к версии ${restoreVersion}?` : ''}
+        confirmLabel="Откатить"
+        variant="danger"
+        busy={restoreBusy}
+        onClose={() => !restoreBusy && setRestoreVersion(null)}
+        onConfirm={confirmRestore}
+      >
+        <>
+          Текущее содержимое страницы останется в истории как новая версия. Вы сможете вернуться к нему позже.
+        </>
+      </ConfirmModal>
     </div>
   );
 }
