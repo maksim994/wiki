@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum SpaceMemberRole {
+  OWNER
+  CONTRIBUTOR
+  READER
+}
+
+enum PageVisibility {
+  PRIVATE
+  INTERNAL
+  PUBLIC
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(VIEWER)
+  disabled     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  spaceMembers SpaceMember[]
+  pagesCreated Page[]      @relation("PageCreatedBy")
+  pagesUpdated Page[]      @relation("PageUpdatedBy")
+  comments     Comment[]
+  versions     PageVersion[]
+  publicShares PublicShare[]
+  auditLogs    AuditLog[]
+}
+
+model Space {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members SpaceMember[]
+  pages   Page[]
+}
+
+model SpaceMember {
+  spaceId String          @map("space_id")
+  userId  String          @map("user_id")
+  role    SpaceMemberRole @default(READER)
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([spaceId, userId])
+  @@index([userId])
+}
+
+model Page {
+  id              String         @id @default(uuid())
+  spaceId         String         @map("space_id")
+  parentId        String?        @map("parent_id")
+  position        Int            @default(0)
+  title           String
+  slug            String
+  visibility      PageVisibility @default(INTERNAL)
+  content         Json           @default("[]")
+  searchText      String         @default("") @map("search_text") @db.Text
+  contentVersion  Int            @default(1) @map("content_version")
+  createdById     String         @map("created_by_id")
+  updatedById     String         @map("updated_by_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
+
+  space       Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  parent      Page?         @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Page[]        @relation("PageTree")
+  createdBy   User          @relation("PageCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User          @relation("PageUpdatedBy", fields: [updatedById], references: [id])
+  versions    PageVersion[]
+  publicShare PublicShare?
+  comments    Comment[]
+
+  @@unique([spaceId, slug])
+  @@index([spaceId, parentId])
+  @@index([spaceId, deletedAt])
+}
+
+model PageVersion {
+  id        String   @id @default(uuid())
+  pageId    String   @map("page_id")
+  version   Int
+  title     String
+  content   Json
+  editedById String @map("edited_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  page     Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  editedBy User @relation(fields: [editedById], references: [id])
+
+  @@unique([pageId, version])
+  @@index([pageId])
+}
+
+model PublicShare {
+  id        String   @id @default(uuid())
+  pageId    String   @unique @map("page_id")
+  token     String   @unique
+  settings  Json     @default("{}")
+  enabled   Boolean  @default(false)
+  createdById String @map("created_by_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  page      Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  pageId    String    @map("page_id")
+  parentId  String?   @map("parent_id")
+  body      String    @db.Text
+  authorId  String    @map("author_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  page   Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([pageId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  userId     String?  @map("user_id")
+  meta       Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+}
+
+model InstanceSettings {
+  id                 Int     @id @default(1)
+  siteName           String  @default("Wiki") @map("site_name")
+  publicSignupEnabled Boolean @default(false) @map("public_signup_enabled")
+}

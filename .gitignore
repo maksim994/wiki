@@ -4,8 +4,10 @@
 !.env.example
 node_modules/
 dist/
+apps/api/public/
 *.log
 .idea/
 .vscode/
 *.swp
 *.swo
+*.tsbuildinfo
