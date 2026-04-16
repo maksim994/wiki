@@ -13,5 +13,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('@blocknote') || id.includes('@tiptap')) return 'editor';
+          if (id.includes('@mantine')) return 'mantine';
+          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/')) {
+            return 'react-vendor';
+          }
+        },
+      },
+    },
   },
 });

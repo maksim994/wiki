@@ -1,8 +1,8 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { api, apiJson } from '../api';
 import { useAuth } from '../AuthContext';
-import { getRecentPages } from '../lib/recentPages';
+import { getRecentPages, RECENT_PAGES_STORAGE_KEY } from '../lib/recentPages';
 
 type TreeNode = {
   id: string;
@@ -22,7 +22,20 @@ export function SpaceLayout() {
   const [loading, setLoading] = useState(true);
   const [memberEmail, setMemberEmail] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const recentInSpace = spaceId ? getRecentPages(spaceId) : [];
+  const [recentTick, setRecentTick] = useState(0);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === RECENT_PAGES_STORAGE_KEY || e.key === null) setRecentTick((t) => t + 1);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const recentInSpace = useMemo(
+    () => (spaceId ? getRecentPages(spaceId) : []),
+    [spaceId, recentTick],
+  );
 
   async function load() {
     if (!spaceId) return;

@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 
-type Hit = { id: string; title: string; spaceId: string; slug: string; updatedAt: string };
+type Hit = {
+  id: string;
+  title: string;
+  spaceId: string;
+  slug: string;
+  updatedAt: string;
+  space?: { id: string; name: string; slug: string };
+};
 
 export function SearchPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -49,6 +56,7 @@ export function SearchPage() {
                 <strong>{r.title}</strong>
               </Link>
               <div className="muted" style={{ fontSize: '0.85rem' }}>
+                {r.space?.name ? `${r.space.name} · ` : ''}
                 {r.slug} · {new Date(r.updatedAt).toLocaleString()}
               </div>
             </li>

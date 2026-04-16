@@ -7,6 +7,7 @@ import { PageScreen } from './pages/PageScreen';
 import { PublicPage } from './pages/PublicPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { SearchPage } from './pages/SearchPage';
+import { GlobalSearchPage } from './pages/GlobalSearchPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -34,6 +35,14 @@ export function App() {
           element={
             <RequireAuth>
               <HomePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/search"
+          element={
+            <RequireAuth>
+              <GlobalSearchPage />
             </RequireAuth>
           }
         />

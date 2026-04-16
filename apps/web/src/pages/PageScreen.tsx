@@ -1,5 +1,5 @@
 import type { BlockNoteEditor } from '@blocknote/core';
-import { FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { api, apiJson, ApiError } from '../api';
 import { PageVersionsPanel } from '../components/PageVersionsPanel';
@@ -48,12 +48,12 @@ export function PageScreen() {
   const versionRef = useRef(0);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!pageId) return;
     const res = await api<PagePayload>(`/api/v1/pages/${pageId}`);
     setData(res);
     versionRef.current = res.page.contentVersion;
-  }
+  }, [pageId]);
 
   useEffect(() => {
     setRemountKey((k) => k + 1);
@@ -64,7 +64,7 @@ export function PageScreen() {
         navigate(`/spaces/${spaceId}`);
       }
     })();
-  }, [pageId, spaceId, navigate]);
+  }, [pageId, spaceId, navigate, load]);
 
   useEffect(() => {
     if (!pageId || !spaceId || !data?.page) return;
@@ -122,7 +122,7 @@ export function PageScreen() {
     }
   }
 
-  async function save() {
+  const save = useCallback(async () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     if (!data || !pageId) return;
     setError(null);
@@ -152,7 +152,19 @@ export function PageScreen() {
         setError(err instanceof Error ? err.message : 'Ошибка сохранения');
       }
     }
-  }
+  }, [data, pageId, load, reloadTree]);
+
+  useEffect(() => {
+    if (!edit || !data?.page.canEdit) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        void save();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [edit, data?.page.canEdit, save]);
 
   async function cancelEdit() {
     setEdit(false);

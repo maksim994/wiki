@@ -11,6 +11,7 @@ export function HomePage() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
+  const [globalSearch, setGlobalSearch] = useState('');
 
   async function load() {
     const res = await api<{ spaces: Space[] }>('/api/v1/spaces');
@@ -27,6 +28,12 @@ export function HomePage() {
     })();
   }, []);
 
+  function submitGlobalSearch(e: FormEvent) {
+    e.preventDefault();
+    const q = globalSearch.trim();
+    navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
+  }
+
   async function createSpace(e: FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -41,6 +48,17 @@ export function HomePage() {
       <header className="topbar">
         <div className="brand">Wiki</div>
         <div className="row">
+          <form className="row" style={{ marginRight: '0.5rem' }} onSubmit={submitGlobalSearch}>
+            <input
+              style={{ width: 200 }}
+              placeholder="Поиск по wiki…"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+            />
+            <button className="btn" type="submit">
+              Найти
+            </button>
+          </form>
           <span className="muted">{user?.email}</span>
           <span className="muted">{user?.role}</span>
           {user?.role === 'ADMIN' && (

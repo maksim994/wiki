@@ -63,6 +63,7 @@ export async function searchRoutes(app: FastifyInstance) {
         slug: true,
         updatedAt: true,
         visibility: true,
+        space: { select: { id: true, name: true, slug: true } },
       },
     });
 

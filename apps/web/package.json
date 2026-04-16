@@ -15,11 +15,13 @@
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
     "@mantine/utils": "^6.0.22",
+    "diff": "^9.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",

@@ -285,6 +285,45 @@ export async function pagesRoutes(app: FastifyInstance) {
     return { versions };
   });
 
+  app.get('/api/v1/pages/:id/versions/compare', { preHandler: [app.authenticate] }, async (req, reply) => {
+    const uid = req.user.sub;
+    const id = (req.params as { id: string }).id;
+    const q = req.query as { from?: string; to?: string };
+    const from = Number(q.from);
+    const to = Number(q.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) {
+      return reply.status(400).send({ error: 'Query from and to must be numbers' });
+    }
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: uid } });
+    const page = await prisma.page.findFirst({ where: { id, deletedAt: null } });
+    if (!page) return reply.status(404).send({ error: 'Not found' });
+
+    const memberRole = await getSpaceMemberRole(user, page.spaceId);
+    if (!memberRole || !canViewPage(user, memberRole, page)) {
+      return reply.status(403).send({ error: 'Forbidden' });
+    }
+
+    const [a, b] = await Promise.all([
+      prisma.pageVersion.findUnique({ where: { pageId_version: { pageId: id, version: from } } }),
+      prisma.pageVersion.findUnique({ where: { pageId_version: { pageId: id, version: to } } }),
+    ]);
+    if (!a || !b) return reply.status(404).send({ error: 'Version not found' });
+
+    return {
+      from: {
+        version: from,
+        title: a.title,
+        plainText: blocksToSearchText(a.content),
+      },
+      to: {
+        version: to,
+        title: b.title,
+        plainText: blocksToSearchText(b.content),
+      },
+    };
+  });
+
   app.get('/api/v1/pages/:id/versions/:version', { preHandler: [app.authenticate] }, async (req, reply) => {
     const uid = req.user.sub;
     const { id, version: v } = req.params as { id: string; version: string };

@@ -1,4 +1,5 @@
-const STORAGE_KEY = 'wiki_recent_v1';
+export const RECENT_PAGES_STORAGE_KEY = 'wiki_recent_v1';
+const STORAGE_KEY = RECENT_PAGES_STORAGE_KEY;
 const MAX = 25;
 
 export type RecentPage = {
