@@ -33,6 +33,15 @@ type PatchPage = {
   updatedAt: string;
 };
 
+const VISIBILITY: Record<
+  'PRIVATE' | 'INTERNAL' | 'PUBLIC',
+  { pill: string; short: string }
+> = {
+  PRIVATE: { pill: 'pill pill--neutral', short: 'Только редакторы' },
+  INTERNAL: { pill: 'pill pill--info', short: 'Участники space' },
+  PUBLIC: { pill: 'pill pill--success', short: 'Публично по ссылке' },
+};
+
 export function PageScreen() {
   const { spaceId, pageId } = useParams<{ spaceId: string; pageId: string }>();
   const { user } = useAuth();
@@ -203,13 +212,21 @@ export function PageScreen() {
   const documentKey = `${pageId}-${remountKey}`;
   const editable = p.canEdit && edit;
 
+  const vis = VISIBILITY[p.visibility];
+
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-        <div className="row">
-          <Link className="muted" to={`/spaces/${spaceId}`}>
-            ← {spaceName || 'Пространство'}
+        <div className="breadcrumb">
+          <Link to="/" className="muted">
+            Пространства
           </Link>
+          <span className="muted">/</span>
+          <Link to={`/spaces/${spaceId}`} className="muted">
+            {spaceName || 'Space'}
+          </Link>
+          <span className="muted">/</span>
+          <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>{p.slug}</span>
         </div>
         <div className="row">
           {edit && p.canEdit && (
@@ -229,6 +246,13 @@ export function PageScreen() {
               <button className="btn primary" type="button" onClick={() => void save()}>
                 Сохранить и выйти
               </button>
+              <span
+                className="muted"
+                style={{ fontSize: '0.78rem' }}
+                title="Быстрое сохранение того же действия, без выхода из режима правки"
+              >
+                {typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? '⌘S' : 'Ctrl+S'}
+              </span>
               <button className="btn" type="button" onClick={() => void cancelEdit()}>
                 Отмена
               </button>
@@ -237,21 +261,27 @@ export function PageScreen() {
         </div>
       </div>
 
-      <h1 style={{ marginTop: 0 }}>{p.title}</h1>
-      <div className="muted row" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <span>{p.slug}</span>
-        <span>·</span>
-        <span>{p.visibility}</span>
+      <h1 className="page-title" style={{ marginBottom: '0.65rem' }}>
+        {p.title}
+      </h1>
+      <div className="row" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
+        <span className={vis.pill}>{vis.short}</span>
+        <span className="muted" style={{ fontSize: '0.85rem' }}>
+          {p.slug}
+        </span>
         {user?.role === 'ADMIN' || p.canEdit ? (
-          <label className="row" style={{ gap: '0.35rem' }}>
-            <span className="muted">доступ:</span>
+          <label className="row" style={{ gap: '0.4rem', marginLeft: 'auto' }}>
+            <span className="muted" style={{ fontSize: '0.85rem' }}>
+              Кто видит страницу
+            </span>
             <select
               value={p.visibility}
               onChange={(e) => void setVisibility(e.target.value as 'PRIVATE' | 'INTERNAL' | 'PUBLIC')}
+              style={{ width: 'auto', minWidth: 200 }}
             >
-              <option value="PRIVATE">Только редакторам</option>
-              <option value="INTERNAL">Всем в space</option>
-              <option value="PUBLIC">Публично (с ссылкой)</option>
+              <option value="PRIVATE">Только редакторы</option>
+              <option value="INTERNAL">Все участники пространства</option>
+              <option value="PUBLIC">Все по ссылке (публично)</option>
             </select>
           </label>
         ) : null}
@@ -279,7 +309,22 @@ export function PageScreen() {
         }}
       />
 
-      {error && <div style={{ color: 'var(--danger)', marginBottom: '0.75rem' }}>{error}</div>}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: '0.75rem',
+            padding: '0.65rem 0.85rem',
+            borderRadius: 'var(--radius)',
+            background: 'rgba(240, 128, 128, 0.1)',
+            border: '1px solid rgba(240, 128, 128, 0.35)',
+            color: '#ffb8b8',
+            fontSize: '0.92rem',
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       <Suspense fallback={<p className="muted">Загрузка редактора…</p>}>
         <WikiBlockEditor
@@ -318,7 +363,7 @@ function CommentsSection({ pageId, canComment }: { pageId: string; canComment: b
   }
 
   return (
-    <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+    <div className="comments-section">
       <h3>Комментарии</h3>
       {!canComment ? (
         <p className="muted">Комментарии недоступны для этой страницы.</p>
@@ -327,8 +372,10 @@ function CommentsSection({ pageId, canComment }: { pageId: string; canComment: b
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {comments.map((c) => (
               <li key={c.id} className="card" style={{ marginBottom: '0.5rem' }}>
-                <div className="muted">{c.author.email}</div>
-                <div>{c.body}</div>
+                <div className="muted" style={{ fontSize: '0.85rem' }}>
+                  {c.author.email}
+                </div>
+                <div style={{ marginTop: '0.35rem' }}>{c.body}</div>
               </li>
             ))}
           </ul>

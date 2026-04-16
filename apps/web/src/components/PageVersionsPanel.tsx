@@ -84,14 +84,20 @@ export function PageVersionsPanel({
   }
 
   return (
-    <div style={{ marginBottom: '1rem' }}>
+    <div style={{ marginBottom: '1.25rem' }}>
+      <div className="section-title" style={{ marginBottom: '0.5rem' }}>
+        История
+      </div>
+      <p className="muted" style={{ margin: '0 0 0.65rem', fontSize: '0.88rem' }}>
+        Каждое сохранение создаёт версию. Можно откатиться или сравнить текст двух версий.
+      </p>
       <div className="row" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
-        <button className="btn" type="button" onClick={() => setOpen((o) => !o)}>
-          {open ? 'Скрыть историю' : 'История версий'}
+        <button className="btn btn-sm" type="button" onClick={() => setOpen((o) => !o)}>
+          {open ? 'Скрыть список' : 'Показать версии'}
         </button>
         {open && versions.length >= 2 && (
-          <button className="btn" type="button" onClick={() => setCompareOpen((c) => !c)}>
-            {compareOpen ? 'Скрыть сравнение' : 'Сравнить версии'}
+          <button className="btn btn-sm" type="button" onClick={() => setCompareOpen((c) => !c)}>
+            {compareOpen ? 'Скрыть сравнение' : 'Сравнить две версии'}
           </button>
         )}
       </div>
@@ -99,7 +105,7 @@ export function PageVersionsPanel({
         <div className="card" style={{ marginTop: '0.75rem' }}>
           <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
             <span className="muted">От</span>
-            <select value={fromV} onChange={(e) => setFromV(Number(e.target.value))}>
+            <select value={fromV} onChange={(e) => setFromV(Number(e.target.value))} style={{ width: 'auto', minWidth: 180 }}>
               {versions.map((v) => (
                 <option key={v.version} value={v.version}>
                   v{v.version} — {new Date(v.createdAt).toLocaleString()}
@@ -107,14 +113,14 @@ export function PageVersionsPanel({
               ))}
             </select>
             <span className="muted">к</span>
-            <select value={toV} onChange={(e) => setToV(Number(e.target.value))}>
+            <select value={toV} onChange={(e) => setToV(Number(e.target.value))} style={{ width: 'auto', minWidth: 180 }}>
               {versions.map((v) => (
                 <option key={v.version} value={v.version}>
                   v{v.version} — {new Date(v.createdAt).toLocaleString()}
                 </option>
               ))}
             </select>
-            <button className="btn primary" type="button" onClick={() => void loadCompare()}>
+            <button className="btn primary btn-sm" type="button" onClick={() => void loadCompare()}>
               Показать отличия
             </button>
           </div>
@@ -136,29 +142,29 @@ export function PageVersionsPanel({
           {loading ? (
             <p className="muted">Загрузка…</p>
           ) : versions.length === 0 ? (
-            <p className="muted">Нет версий.</p>
+            <p className="muted">Пока одна версия — сохраните страницу ещё раз, чтобы появилась история.</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>№</th>
-                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>Когда</th>
-                  <th style={{ textAlign: 'left', padding: '0.25rem' }}>Автор</th>
-                  {canRestore ? <th /> : null}
+                  <th style={{ textAlign: 'left', padding: '0.35rem', borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>№</th>
+                  <th style={{ textAlign: 'left', padding: '0.35rem', borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>Когда</th>
+                  <th style={{ textAlign: 'left', padding: '0.35rem', borderBottom: '1px solid var(--border)', color: 'var(--muted)' }}>Кто правил</th>
+                  {canRestore ? <th style={{ borderBottom: '1px solid var(--border)' }} /> : null}
                 </tr>
               </thead>
               <tbody>
                 {versions.map((v) => (
                   <tr key={v.version}>
-                    <td style={{ padding: '0.25rem' }}>{v.version}</td>
-                    <td style={{ padding: '0.25rem' }}>{new Date(v.createdAt).toLocaleString()}</td>
-                    <td style={{ padding: '0.25rem' }} className="muted">
+                    <td style={{ padding: '0.4rem 0.35rem', borderBottom: '1px solid var(--border)' }}>{v.version}</td>
+                    <td style={{ padding: '0.4rem 0.35rem', borderBottom: '1px solid var(--border)' }}>{new Date(v.createdAt).toLocaleString()}</td>
+                    <td style={{ padding: '0.4rem 0.35rem', borderBottom: '1px solid var(--border)' }} className="muted">
                       {v.editedBy.email}
                     </td>
                     {canRestore ? (
-                      <td style={{ padding: '0.25rem' }}>
-                        <button className="btn" type="button" onClick={() => void restore(v.version)}>
-                          Восстановить
+                      <td style={{ padding: '0.4rem 0.35rem', borderBottom: '1px solid var(--border)' }}>
+                        <button className="btn btn-sm" type="button" onClick={() => void restore(v.version)}>
+                          Откатить сюда
                         </button>
                       </td>
                     ) : null}

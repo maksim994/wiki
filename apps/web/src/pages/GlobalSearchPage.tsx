@@ -56,15 +56,17 @@ export function GlobalSearchPage() {
   return (
     <div className="layout">
       <header className="topbar">
-        <div className="row">
+        <div className="breadcrumb">
           <Link className="brand" to="/">
             Wiki
           </Link>
           <span className="muted">/</span>
-          <span>Поиск</span>
+          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Поиск</span>
         </div>
         <div className="row">
-          <span className="muted">{user?.email}</span>
+          <span className="user-chip" title={user?.email}>
+            {user?.email}
+          </span>
           <Link className="btn" to="/">
             Пространства
           </Link>
@@ -74,35 +76,42 @@ export function GlobalSearchPage() {
         </div>
       </header>
       <main className="main">
-        <h1 style={{ marginTop: 0, fontSize: '1.15rem' }}>Поиск по всем доступным пространствам</h1>
-        <form className="row" style={{ marginBottom: '1rem', maxWidth: 520 }} onSubmit={onSubmit}>
-          <input
-            style={{ flex: 1 }}
-            placeholder="Запрос…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            autoFocus
-          />
+        <div className="page-hero">
+          <h1 className="page-title page-title--sm">Поиск по wiki</h1>
+          <p className="page-lead">Ищем по заголовкам и тексту страниц во всех пространствах, к которым у вас есть доступ.</p>
+        </div>
+        <form className="search-field" style={{ marginBottom: '1.25rem', maxWidth: 560 }} onSubmit={onSubmit}>
+          <input placeholder="Слова или фраза…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <button className="btn primary" type="submit">
             Найти
           </button>
         </form>
         {!submitted.trim() ? (
-          <p className="muted">Введите запрос и нажмите «Найти».</p>
+          <div className="empty-state" style={{ textAlign: 'left' }}>
+            <p className="muted" style={{ margin: 0 }}>
+              Введите запрос выше — покажем до 50 подходящих страниц, новые сверху.
+            </p>
+          </div>
         ) : loading ? (
-          <p className="muted">Поиск…</p>
+          <div className="space-grid" style={{ maxWidth: 560 }}>
+            <div className="skeleton" style={{ height: 56, borderRadius: 'var(--radius-lg)' }} />
+            <div className="skeleton" style={{ height: 56, borderRadius: 'var(--radius-lg)' }} />
+          </div>
         ) : results.length === 0 ? (
-          <p className="muted">Ничего не найдено.</p>
+          <div className="empty-state">
+            <h3>Ничего не нашли</h3>
+            <p className="muted">Попробуйте другие слова или поиск внутри конкретного пространства слева в боковой панели.</p>
+          </div>
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0 }}>
+          <ul className="result-list">
             {results.map((r) => (
-              <li key={r.id} className="card" style={{ marginBottom: '0.5rem' }}>
-                <Link to={`/spaces/${r.spaceId}/pages/${r.id}`}>
+              <li key={r.id} className="result-item">
+                <Link className="card card--interactive" to={`/spaces/${r.spaceId}/pages/${r.id}`} style={{ display: 'block' }}>
                   <strong>{r.title}</strong>
+                  <div className="muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                    {r.space?.name ?? 'Пространство'} · {r.slug} · обновлено {new Date(r.updatedAt).toLocaleString()}
+                  </div>
                 </Link>
-                <div className="muted" style={{ fontSize: '0.85rem' }}>
-                  {r.space?.name ?? r.spaceId} · {r.slug} · {new Date(r.updatedAt).toLocaleString()}
-                </div>
               </li>
             ))}
           </ul>

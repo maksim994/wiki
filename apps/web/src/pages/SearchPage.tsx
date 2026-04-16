@@ -41,24 +41,37 @@ export function SearchPage() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Поиск{spaceName ? ` · ${spaceName}` : ''}</h2>
+      <div className="page-hero">
+        <h1 className="page-title page-title--sm">Поиск{spaceName ? ` · ${spaceName}` : ''}</h1>
+        <p className="page-lead">Результаты только в этом пространстве. Запрос можно изменить в поле слева.</p>
+      </div>
       {!q.trim() ? (
-        <p className="muted">Введите запрос в поле слева и нажмите «Найти».</p>
+        <div className="empty-state" style={{ textAlign: 'left', padding: '1.25rem' }}>
+          <p className="muted" style={{ margin: 0 }}>
+            Введите запрос в боковой панели и нажмите «Найти».
+          </p>
+        </div>
       ) : loading ? (
-        <p className="muted">Поиск…</p>
+        <div style={{ maxWidth: 520 }}>
+          <div className="skeleton" style={{ height: 56, borderRadius: 'var(--radius-lg)', marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 56, borderRadius: 'var(--radius-lg)' }} />
+        </div>
       ) : results.length === 0 ? (
-        <p className="muted">Ничего не найдено.</p>
+        <div className="empty-state">
+          <h3>Ничего не нашли</h3>
+          <p className="muted">Попробуйте укоротить фразу или другие слова.</p>
+        </div>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
+        <ul className="result-list">
           {results.map((r) => (
-            <li key={r.id} className="card" style={{ marginBottom: '0.5rem' }}>
-              <Link to={`/spaces/${spaceId}/pages/${r.id}`}>
+            <li key={r.id} className="result-item">
+              <Link className="card card--interactive" to={`/spaces/${spaceId}/pages/${r.id}`} style={{ display: 'block' }}>
                 <strong>{r.title}</strong>
+                <div className="muted" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                  {r.space?.name ? `${r.space.name} · ` : ''}
+                  {r.slug} · {new Date(r.updatedAt).toLocaleString()}
+                </div>
               </Link>
-              <div className="muted" style={{ fontSize: '0.85rem' }}>
-                {r.space?.name ? `${r.space.name} · ` : ''}
-                {r.slug} · {new Date(r.updatedAt).toLocaleString()}
-              </div>
             </li>
           ))}
         </ul>
