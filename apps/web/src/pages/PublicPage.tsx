@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api';
-import { BlockView } from '../components/BlockView';
+import { WikiBlockEditor } from '../components/WikiBlockEditor';
 
 export function PublicPage() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<{
-    page: { title: string; content: unknown; updatedAt?: string };
+    page: { title: string; content: unknown };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,13 @@ export function PublicPage() {
     })();
   }, [token]);
 
-  if (error) return <div className="main"><p style={{ color: 'var(--danger)' }}>{error}</p></div>;
+  if (error) {
+    return (
+      <div className="main">
+        <p style={{ color: 'var(--danger)' }}>{error}</p>
+      </div>
+    );
+  }
   if (!data) return <div className="main muted">Загрузка…</div>;
 
   return (
@@ -30,8 +36,8 @@ export function PublicPage() {
       <div className="muted" style={{ marginBottom: '1rem' }}>
         Публичная страница
       </div>
-      <h1>{data.page.title}</h1>
-      <BlockView content={data.page.content} />
+      <h1 style={{ marginTop: 0 }}>{data.page.title}</h1>
+      <WikiBlockEditor content={data.page.content} documentKey={`pub-${token}`} editable={false} />
     </div>
   );
 }

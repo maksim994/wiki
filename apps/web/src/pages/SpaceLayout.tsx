@@ -20,6 +20,7 @@ export function SpaceLayout() {
   const [members, setMembers] = useState<Array<{ user: { id: string; email: string }; role: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [memberEmail, setMemberEmail] = useState('');
+  const [searchInput, setSearchInput] = useState('');
 
   async function load() {
     if (!spaceId) return;
@@ -128,6 +129,25 @@ export function SpaceLayout() {
               </div>
             </form>
           )}
+          <form
+            className="row"
+            style={{ marginBottom: '0.75rem' }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = searchInput.trim();
+              navigate(q ? `/spaces/${spaceId}/search?q=${encodeURIComponent(q)}` : `/spaces/${spaceId}/search`);
+            }}
+          >
+            <input
+              style={{ flex: 1 }}
+              placeholder="Поиск в space…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <button className="btn" type="submit">
+              Найти
+            </button>
+          </form>
           {loading ? (
             <p className="muted">Загрузка…</p>
           ) : (
@@ -135,7 +155,7 @@ export function SpaceLayout() {
           )}
         </aside>
         <section className="card" style={{ minHeight: 360 }}>
-          <Outlet context={{ reloadTree: load }} />
+          <Outlet context={{ reloadTree: load, spaceName }} />
         </section>
       </div>
     </div>

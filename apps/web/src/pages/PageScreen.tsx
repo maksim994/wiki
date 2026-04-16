@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
+import type { BlockNoteEditor } from '@blocknote/core';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { api, apiJson, ApiError } from '../api';
+import { WikiBlockEditor } from '../components/WikiBlockEditor';
 import { useAuth } from '../AuthContext';
-import { BlockView } from '../components/BlockView';
 
 type PagePayload = {
   page: {
@@ -24,17 +25,17 @@ export function PageScreen() {
   const { spaceId, pageId } = useParams<{ spaceId: string; pageId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { reloadTree } = useOutletContext<{ reloadTree: () => Promise<void> }>();
+  const { reloadTree, spaceName } = useOutletContext<{ reloadTree: () => Promise<void>; spaceName: string }>();
   const [data, setData] = useState<PagePayload | null>(null);
   const [edit, setEdit] = useState(false);
-  const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [discardTick, setDiscardTick] = useState(0);
+  const editorRef = useRef<BlockNoteEditor | null>(null);
 
   async function load() {
     if (!pageId) return;
     const res = await api<PagePayload>(`/api/v1/pages/${pageId}`);
     setData(res);
-    setDraft(JSON.stringify(res.page.content ?? [], null, 2));
   }
 
   useEffect(() => {
@@ -47,32 +48,40 @@ export function PageScreen() {
     })();
   }, [pageId, spaceId, navigate]);
 
-  async function save(e: FormEvent) {
-    e.preventDefault();
+  async function save() {
     if (!data || !pageId) return;
     setError(null);
-    let content: unknown;
-    try {
-      content = JSON.parse(draft);
-    } catch {
-      setError('Некорректный JSON');
+    const ed = editorRef.current;
+    if (!ed) {
+      setError('Редактор не готов');
       return;
     }
     try {
-      await apiJson(`/api/v1/pages/${pageId}`, {
-        content,
-        contentVersion: data.page.contentVersion,
-      }, 'PATCH');
+      const content = ed.document;
+      await apiJson(
+        `/api/v1/pages/${pageId}`,
+        {
+          content,
+          contentVersion: data.page.contentVersion,
+        },
+        'PATCH',
+      );
       await load();
       await reloadTree();
       setEdit(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError('Конфликт версии. Перезагрузите страницу.');
+        setError('Конфикт версии. Перезагрузите страницу.');
       } else {
         setError(err instanceof Error ? err.message : 'Ошибка сохранения');
       }
     }
+  }
+
+  async function cancelEdit() {
+    setEdit(false);
+    setDiscardTick((t) => t + 1);
+    await load();
   }
 
   async function setVisibility(v: 'PRIVATE' | 'INTERNAL' | 'PUBLIC') {
@@ -100,13 +109,15 @@ export function PageScreen() {
   if (!data) return <p className="muted">Загрузка…</p>;
 
   const p = data.page;
+  const documentKey = `${pageId}-${p.contentVersion}-${discardTick}`;
+  const editable = p.canEdit && edit;
 
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
         <div className="row">
           <Link className="muted" to={`/spaces/${spaceId}`}>
-            ← Space
+            ← {spaceName || 'Пространство'}
           </Link>
         </div>
         <div className="row">
@@ -116,24 +127,33 @@ export function PageScreen() {
             </button>
           )}
           {p.canEdit && edit && (
-            <button className="btn" type="button" onClick={() => setEdit(false)}>
-              Отмена
-            </button>
+            <>
+              <button className="btn primary" type="button" onClick={() => void save()}>
+                Сохранить
+              </button>
+              <button className="btn" type="button" onClick={() => void cancelEdit()}>
+                Отмена
+              </button>
+            </>
           )}
         </div>
       </div>
 
       <h1 style={{ marginTop: 0 }}>{p.title}</h1>
-      <div className="muted row" style={{ marginBottom: '1rem' }}>
-        <span>slug: {p.slug}</span>
-        <span>видимость: {p.visibility}</span>
+      <div className="muted row" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <span>{p.slug}</span>
+        <span>·</span>
+        <span>{p.visibility}</span>
         {user?.role === 'ADMIN' || p.canEdit ? (
-          <label>
-            <span className="muted"> сменить: </span>
-            <select value={p.visibility} onChange={(e) => void setVisibility(e.target.value as 'PRIVATE' | 'INTERNAL' | 'PUBLIC')}>
-              <option value="PRIVATE">PRIVATE</option>
-              <option value="INTERNAL">INTERNAL</option>
-              <option value="PUBLIC">PUBLIC</option>
+          <label className="row" style={{ gap: '0.35rem' }}>
+            <span className="muted">доступ:</span>
+            <select
+              value={p.visibility}
+              onChange={(e) => void setVisibility(e.target.value as 'PRIVATE' | 'INTERNAL' | 'PUBLIC')}
+            >
+              <option value="PRIVATE">Только редакторам</option>
+              <option value="INTERNAL">Всем в space</option>
+              <option value="PUBLIC">Публично (с ссылкой)</option>
             </select>
           </label>
         ) : null}
@@ -142,28 +162,22 @@ export function PageScreen() {
       {p.canEdit && (
         <div className="row" style={{ marginBottom: '1rem' }}>
           <button className="btn" type="button" onClick={() => void togglePublic(true)}>
-            Публичная ссылка (вкл)
+            Включить публичную ссылку
           </button>
           <button className="btn" type="button" onClick={() => void togglePublic(false)}>
-            Публичная ссылка (выкл)
+            Выключить публичную ссылку
           </button>
         </div>
       )}
 
-      {edit ? (
-        <form className="grid" onSubmit={save}>
-          <p className="muted">Контент — JSON-массив блоков (MVP). См. документацию в репозитории или введите валидный JSON-массив.</p>
-          <textarea className="block-editor" value={draft} onChange={(e) => setDraft(e.target.value)} rows={18} />
-          {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-          <button className="btn primary" type="submit">
-            Сохранить
-          </button>
-        </form>
-      ) : (
-        <div className="page-view">
-          <BlockView content={p.content} />
-        </div>
-      )}
+      {error && <div style={{ color: 'var(--danger)', marginBottom: '0.75rem' }}>{error}</div>}
+
+      <WikiBlockEditor
+        content={p.content}
+        documentKey={documentKey}
+        editable={editable}
+        editorRef={p.canEdit ? editorRef : undefined}
+      />
 
       <CommentsSection pageId={p.id} canComment={p.canComment} />
     </div>
