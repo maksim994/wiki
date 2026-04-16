@@ -13,9 +13,11 @@ type Props = {
   className?: string;
   /** Для чтения document при сохранении (только режим редактирования) */
   editorRef?: React.MutableRefObject<BlockNoteEditor | null>;
+  /** Вызывается при изменении документа (для автосохранения) */
+  onDocumentChange?: () => void;
 };
 
-export function WikiBlockEditor({ content, documentKey, editable, className, editorRef }: Props) {
+export function WikiBlockEditor({ content, documentKey, editable, className, editorRef, onDocumentChange }: Props) {
   const initialContent = useMemo(() => toPartialBlocks(content), [content, documentKey]);
 
   const editor = useCreateBlockNote(
@@ -35,7 +37,12 @@ export function WikiBlockEditor({ content, documentKey, editable, className, edi
 
   return (
     <div className={`wiki-blocknote ${className ?? ''}`} style={{ minHeight: editable ? 320 : undefined }}>
-      <BlockNoteView editor={editor} editable={editable} theme="dark" />
+      <BlockNoteView
+        editor={editor}
+        editable={editable}
+        theme="dark"
+        onChange={onDocumentChange}
+      />
     </div>
   );
 }

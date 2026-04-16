@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { api, apiJson } from '../api';
 import { useAuth } from '../AuthContext';
+import { getRecentPages } from '../lib/recentPages';
 
 type TreeNode = {
   id: string;
@@ -21,6 +22,7 @@ export function SpaceLayout() {
   const [loading, setLoading] = useState(true);
   const [memberEmail, setMemberEmail] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const recentInSpace = spaceId ? getRecentPages(spaceId) : [];
 
   async function load() {
     if (!spaceId) return;
@@ -148,6 +150,20 @@ export function SpaceLayout() {
               Найти
             </button>
           </form>
+          {recentInSpace.length > 0 && (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div className="muted" style={{ fontSize: '0.85rem', marginBottom: '0.35rem' }}>
+                Недавние
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {recentInSpace.map((r) => (
+                  <li key={r.id} style={{ marginBottom: '0.25rem' }}>
+                    <NavLink to={`/spaces/${r.spaceId}/pages/${r.id}`}>{r.title}</NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {loading ? (
             <p className="muted">Загрузка…</p>
           ) : (

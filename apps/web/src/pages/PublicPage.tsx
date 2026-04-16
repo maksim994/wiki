@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api';
-import { WikiBlockEditor } from '../components/WikiBlockEditor';
+
+const WikiBlockEditor = lazy(() =>
+  import('../components/WikiBlockEditor').then((m) => ({ default: m.WikiBlockEditor })),
+);
 
 export function PublicPage() {
   const { token } = useParams<{ token: string }>();
@@ -37,7 +40,9 @@ export function PublicPage() {
         Публичная страница
       </div>
       <h1 style={{ marginTop: 0 }}>{data.page.title}</h1>
-      <WikiBlockEditor content={data.page.content} documentKey={`pub-${token}`} editable={false} />
+      <Suspense fallback={<p className="muted">Загрузка…</p>}>
+        <WikiBlockEditor content={data.page.content} documentKey={`pub-${token}`} editable={false} />
+      </Suspense>
     </div>
   );
 }

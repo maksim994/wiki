@@ -1,9 +1,14 @@
 import type { BlockNoteEditor } from '@blocknote/core';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { api, apiJson, ApiError } from '../api';
-import { WikiBlockEditor } from '../components/WikiBlockEditor';
+import { PageVersionsPanel } from '../components/PageVersionsPanel';
 import { useAuth } from '../AuthContext';
+import { addRecentPage } from '../lib/recentPages';
+
+const WikiBlockEditor = lazy(() =>
+  import('../components/WikiBlockEditor').then((m) => ({ default: m.WikiBlockEditor })),
+);
 
 type PagePayload = {
   page: {
@@ -21,6 +26,13 @@ type PagePayload = {
   };
 };
 
+type PatchPage = {
+  id: string;
+  content: unknown;
+  contentVersion: number;
+  updatedAt: string;
+};
+
 export function PageScreen() {
   const { spaceId, pageId } = useParams<{ spaceId: string; pageId: string }>();
   const { user } = useAuth();
@@ -29,16 +41,22 @@ export function PageScreen() {
   const [data, setData] = useState<PagePayload | null>(null);
   const [edit, setEdit] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discardTick, setDiscardTick] = useState(0);
+  /** Сброс редактора при смене страницы / отмене / выходе из режима правки / восстановлении версии */
+  const [remountKey, setRemountKey] = useState(0);
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved' | 'err'>('idle');
   const editorRef = useRef<BlockNoteEditor | null>(null);
+  const versionRef = useRef(0);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load() {
     if (!pageId) return;
     const res = await api<PagePayload>(`/api/v1/pages/${pageId}`);
     setData(res);
+    versionRef.current = res.page.contentVersion;
   }
 
   useEffect(() => {
+    setRemountKey((k) => k + 1);
     void (async () => {
       try {
         await load();
@@ -48,7 +66,64 @@ export function PageScreen() {
     })();
   }, [pageId, spaceId, navigate]);
 
+  useEffect(() => {
+    if (!pageId || !spaceId || !data?.page) return;
+    addRecentPage({ id: pageId, spaceId, title: data.page.title });
+  }, [pageId, spaceId, data?.page?.title]);
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+  }, []);
+
+  function scheduleAutosave() {
+    if (!edit || !data?.page.canEdit) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => void silentSave(), 2000);
+  }
+
+  async function silentSave() {
+    if (!data || !pageId || !edit) return;
+    const ed = editorRef.current;
+    if (!ed) return;
+    setAutosaveState('saving');
+    setError(null);
+    try {
+      const content = ed.document;
+      const res = await apiJson<{ page: PatchPage }>(
+        `/api/v1/pages/${pageId}`,
+        {
+          content,
+          contentVersion: versionRef.current,
+        },
+        'PATCH',
+      );
+      versionRef.current = res.page.contentVersion;
+      setData((prev) =>
+        prev
+          ? {
+              page: {
+                ...prev.page,
+                contentVersion: res.page.contentVersion,
+                content: res.page.content,
+                updatedAt: res.page.updatedAt,
+              },
+            }
+          : prev,
+      );
+      setAutosaveState('saved');
+      window.setTimeout(() => setAutosaveState('idle'), 1500);
+    } catch (err) {
+      setAutosaveState('err');
+      if (err instanceof ApiError && err.status === 409) {
+        setError('Версия изменилась. Сохраните вручную или перезагрузите страницу.');
+      }
+    }
+  }
+
   async function save() {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     if (!data || !pageId) return;
     setError(null);
     const ed = editorRef.current;
@@ -62,16 +137,17 @@ export function PageScreen() {
         `/api/v1/pages/${pageId}`,
         {
           content,
-          contentVersion: data.page.contentVersion,
+          contentVersion: versionRef.current,
         },
         'PATCH',
       );
       await load();
       await reloadTree();
       setEdit(false);
+      setRemountKey((k) => k + 1);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError('Конфикт версии. Перезагрузите страницу.');
+        setError('Конфликт версии. Перезагрузите страницу.');
       } else {
         setError(err instanceof Error ? err.message : 'Ошибка сохранения');
       }
@@ -80,8 +156,9 @@ export function PageScreen() {
 
   async function cancelEdit() {
     setEdit(false);
-    setDiscardTick((t) => t + 1);
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     await load();
+    setRemountKey((k) => k + 1);
   }
 
   async function setVisibility(v: 'PRIVATE' | 'INTERNAL' | 'PUBLIC') {
@@ -89,6 +166,7 @@ export function PageScreen() {
     await apiJson(`/api/v1/pages/${pageId}`, { visibility: v }, 'PATCH');
     await load();
     await reloadTree();
+    setRemountKey((k) => k + 1);
   }
 
   async function togglePublic(enable: boolean) {
@@ -104,12 +182,13 @@ export function PageScreen() {
     if (res.share.publicUrl) {
       void navigator.clipboard.writeText(res.share.publicUrl);
     }
+    setRemountKey((k) => k + 1);
   }
 
   if (!data) return <p className="muted">Загрузка…</p>;
 
   const p = data.page;
-  const documentKey = `${pageId}-${p.contentVersion}-${discardTick}`;
+  const documentKey = `${pageId}-${remountKey}`;
   const editable = p.canEdit && edit;
 
   return (
@@ -121,6 +200,13 @@ export function PageScreen() {
           </Link>
         </div>
         <div className="row">
+          {edit && p.canEdit && (
+            <span className="muted" style={{ fontSize: '0.85rem' }}>
+              {autosaveState === 'saving' && 'Сохранение…'}
+              {autosaveState === 'saved' && 'Сохранено'}
+              {autosaveState === 'err' && 'Ошибка автосохранения'}
+            </span>
+          )}
           {p.canEdit && !edit && (
             <button className="btn primary" type="button" onClick={() => setEdit(true)}>
               Редактировать
@@ -129,7 +215,7 @@ export function PageScreen() {
           {p.canEdit && edit && (
             <>
               <button className="btn primary" type="button" onClick={() => void save()}>
-                Сохранить
+                Сохранить и выйти
               </button>
               <button className="btn" type="button" onClick={() => void cancelEdit()}>
                 Отмена
@@ -170,14 +256,28 @@ export function PageScreen() {
         </div>
       )}
 
+      <PageVersionsPanel
+        pageId={p.id}
+        canRestore={p.canEdit}
+        onRestored={async () => {
+          await load();
+          await reloadTree();
+          setEdit(false);
+          setRemountKey((k) => k + 1);
+        }}
+      />
+
       {error && <div style={{ color: 'var(--danger)', marginBottom: '0.75rem' }}>{error}</div>}
 
-      <WikiBlockEditor
-        content={p.content}
-        documentKey={documentKey}
-        editable={editable}
-        editorRef={p.canEdit ? editorRef : undefined}
-      />
+      <Suspense fallback={<p className="muted">Загрузка редактора…</p>}>
+        <WikiBlockEditor
+          content={p.content}
+          documentKey={documentKey}
+          editable={editable}
+          editorRef={p.canEdit ? editorRef : undefined}
+          onDocumentChange={editable ? scheduleAutosave : undefined}
+        />
+      </Suspense>
 
       <CommentsSection pageId={p.id} canComment={p.canComment} />
     </div>
