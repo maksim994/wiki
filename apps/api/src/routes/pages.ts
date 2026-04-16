@@ -140,6 +140,8 @@ export async function pagesRoutes(app: FastifyInstance) {
     if (!memberRole) return reply.status(403).send({ error: 'Forbidden' });
     if (!canViewPage(user, memberRole, page)) return reply.status(403).send({ error: 'Forbidden' });
 
+    const breadcrumb = await pageAncestorChain(page.spaceId, page.parentId);
+
     return {
       page: {
         id: page.id,
@@ -159,6 +161,7 @@ export async function pagesRoutes(app: FastifyInstance) {
         canEdit: canEditPage(user, memberRole),
         canComment: canCommentOnPage(user, memberRole, page),
       },
+      breadcrumb,
     };
   });
 
@@ -468,6 +471,25 @@ type PageNode = {
   updatedAt: Date;
   children: PageNode[];
 };
+
+/** Цепочка от корня до прямого родителя (сама страница не входит). */
+async function pageAncestorChain(
+  spaceId: string,
+  parentId: string | null,
+): Promise<Array<{ id: string; title: string }>> {
+  const ancestors: Array<{ id: string; title: string }> = [];
+  let pid: string | null = parentId;
+  for (let depth = 0; depth < 64 && pid; depth++) {
+    const row = await prisma.page.findFirst({
+      where: { id: pid, spaceId, deletedAt: null },
+      select: { id: true, title: true, parentId: true },
+    });
+    if (!row) break;
+    ancestors.unshift({ id: row.id, title: row.title });
+    pid = row.parentId;
+  }
+  return ancestors;
+}
 
 function buildTree(
   pages: Array<{

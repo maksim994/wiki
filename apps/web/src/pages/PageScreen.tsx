@@ -1,5 +1,5 @@
 import type { BlockNoteEditor } from '@blocknote/core';
-import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, Fragment, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { api, apiJson, ApiError } from '../api';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -16,6 +16,7 @@ type PagePayload = {
   page: {
     id: string;
     spaceId: string;
+    parentId: string | null;
     title: string;
     slug: string;
     visibility: 'PRIVATE' | 'INTERNAL' | 'PUBLIC';
@@ -26,6 +27,7 @@ type PagePayload = {
     canComment: boolean;
     publicShare?: { enabled: boolean; token: string } | null;
   };
+  breadcrumb: Array<{ id: string; title: string }>;
 };
 
 type PatchPage = {
@@ -86,6 +88,15 @@ export function PageScreen() {
   }, [pageId, spaceId, data?.page?.title]);
 
   useEffect(() => {
+    if (!data?.page.title) return;
+    const t = `${data.page.title} · Wiki`;
+    document.title = t;
+    return () => {
+      document.title = 'Wiki';
+    };
+  }, [data?.page.title]);
+
+  useEffect(() => {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
@@ -117,6 +128,7 @@ export function PageScreen() {
       setData((prev) =>
         prev
           ? {
+              ...prev,
               page: {
                 ...prev.page,
                 contentVersion: res.page.contentVersion,
@@ -230,6 +242,7 @@ export function PageScreen() {
   if (!data) return <p className="muted">Загрузка…</p>;
 
   const p = data.page;
+  const crumbs = data.breadcrumb ?? [];
   const documentKey = `${pageId}-${remountKey}`;
   const editable = p.canEdit && edit;
 
@@ -238,17 +251,33 @@ export function PageScreen() {
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-        <div className="breadcrumb">
+        <nav className="breadcrumb" aria-label="Навигация по страницам" style={{ flexWrap: 'wrap', rowGap: '0.2rem' }}>
           <Link to="/" className="muted">
             Пространства
           </Link>
-          <span className="muted">/</span>
+          <span className="muted" aria-hidden>
+            /
+          </span>
           <Link to={`/spaces/${spaceId}`} className="muted">
-            {spaceName || 'Space'}
+            {spaceName || 'Пространство'}
           </Link>
-          <span className="muted">/</span>
-          <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>{p.slug}</span>
-        </div>
+          {crumbs.map((c) => (
+            <Fragment key={c.id}>
+              <span className="muted" aria-hidden>
+                /
+              </span>
+              <Link to={`/spaces/${spaceId}/pages/${c.id}`} className="muted">
+                {c.title}
+              </Link>
+            </Fragment>
+          ))}
+          <span className="muted" aria-hidden>
+            /
+          </span>
+          <span className="muted" style={{ fontSize: '0.9rem' }}>
+            {p.slug}
+          </span>
+        </nav>
         <div className="row">
           {edit && p.canEdit && (
             <span className="muted" style={{ fontSize: '0.85rem' }}>
