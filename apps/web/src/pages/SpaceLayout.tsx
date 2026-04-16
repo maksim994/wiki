@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, apiJson } from '../api';
 import { useAuth } from '../AuthContext';
 import { CreatePageModal } from '../components/CreatePageModal';
+import { useToast } from '../components/ToastProvider';
 import { getRecentPages, RECENT_PAGES_STORAGE_KEY } from '../lib/recentPages';
 
 type TreeNode = {
@@ -17,6 +18,8 @@ export function SpaceLayout() {
   const { spaceId } = useParams<{ spaceId: string }>();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { showToast } = useToast();
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [spaceName, setSpaceName] = useState('');
   const [members, setMembers] = useState<Array<{ user: { id: string; email: string }; role: string }>>([]);
@@ -26,6 +29,11 @@ export function SpaceLayout() {
   const [recentTick, setRecentTick] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -71,15 +79,20 @@ export function SpaceLayout() {
   async function addMember(e: FormEvent) {
     e.preventDefault();
     if (!spaceId || !memberEmail.trim()) return;
-    const usersRes = await api<{ users: Array<{ id: string; email: string }> }>('/api/v1/users');
-    const u = usersRes.users.find((x) => x.email.toLowerCase() === memberEmail.trim().toLowerCase());
-    if (!u) {
-      window.alert('Пользователь не найден. Создайте его в разделе «Пользователи».');
-      return;
+    try {
+      const usersRes = await api<{ users: Array<{ id: string; email: string }> }>('/api/v1/users');
+      const u = usersRes.users.find((x) => x.email.toLowerCase() === memberEmail.trim().toLowerCase());
+      if (!u) {
+        showToast('Такого пользователя нет. Сначала создайте его в разделе «Пользователи».', 'error');
+        return;
+      }
+      await apiJson(`/api/v1/spaces/${spaceId}/members`, { userId: u.id, role: 'CONTRIBUTOR' });
+      setMemberEmail('');
+      await load();
+      showToast(`${u.email} добавлен в это пространство`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Не удалось добавить участника', 'error');
     }
-    await apiJson(`/api/v1/spaces/${spaceId}/members`, { userId: u.id, role: 'CONTRIBUTOR' });
-    setMemberEmail('');
-    await load();
   }
 
   async function createPage(parentId: string | null, title: string) {
@@ -103,9 +116,19 @@ export function SpaceLayout() {
   }
 
   return (
-    <div className="layout">
-      <header className="topbar">
-        <div className="breadcrumb">
+    <div className={'layout space-shell' + (sidebarOpen ? ' space-shell--sidebar-open' : '')}>
+      <header className="topbar topbar-wrap">
+        <div className="row" style={{ alignItems: 'center', gap: '0.5rem', flex: '1 1 auto', minWidth: 0 }}>
+          <button
+            type="button"
+            className="btn btn-sm space-menu-toggle"
+            aria-expanded={sidebarOpen}
+            aria-controls="space-sidebar"
+            onClick={() => setSidebarOpen((o) => !o)}
+          >
+            {sidebarOpen ? '✕' : '☰'} <span className="muted" style={{ fontSize: '0.8rem', marginLeft: 2 }}>Страницы</span>
+          </button>
+          <div className="breadcrumb" style={{ minWidth: 0 }}>
           <Link className="brand" to="/">
             Wiki
           </Link>
@@ -115,6 +138,7 @@ export function SpaceLayout() {
           </Link>
           <span className="muted">/</span>
           <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{spaceName || '…'}</span>
+          </div>
         </div>
         <div className="row">
           <Link className="btn btn-ghost" to="/search">
@@ -133,8 +157,15 @@ export function SpaceLayout() {
           </button>
         </div>
       </header>
-      <div className="main split">
-        <aside className="card" style={{ position: 'sticky', top: '1rem' }}>
+      <button
+        type="button"
+        className="space-sidebar-backdrop"
+        aria-label="Закрыть меню страниц"
+        tabIndex={-1}
+        onClick={() => setSidebarOpen(false)}
+      />
+      <div className="main space-split">
+        <aside id="space-sidebar" className="card space-sidebar">
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <span className="section-title" style={{ margin: 0 }}>
               Страницы
@@ -220,7 +251,7 @@ export function SpaceLayout() {
             <TreeNav spaceId={spaceId!} nodes={tree} onCreateChild={openCreateChild} />
           )}
         </aside>
-        <section className="card" style={{ minHeight: 380 }}>
+        <section className="card space-content">
           <Outlet context={{ reloadTree: load, spaceName }} />
         </section>
       </div>
@@ -285,7 +316,7 @@ export function SpaceIndex() {
         Добро пожаловать
       </h1>
       <p className="page-lead" style={{ marginBottom: '1rem' }}>
-        Выберите страницу в дереве слева или создайте новую — она появится в списке и в поиске.
+        Выберите страницу в списке (кнопка «Страницы» на телефоне) или создайте новую — она появится в дереве и в поиске.
       </p>
       <p className="muted">
         <Link to="/">← Все пространства</Link>

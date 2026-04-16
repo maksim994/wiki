@@ -2,7 +2,9 @@ import type { BlockNoteEditor } from '@blocknote/core';
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { api, apiJson, ApiError } from '../api';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { PageVersionsPanel } from '../components/PageVersionsPanel';
+import { useToast } from '../components/ToastProvider';
 import { useAuth } from '../AuthContext';
 import { addRecentPage } from '../lib/recentPages';
 
@@ -45,6 +47,7 @@ const VISIBILITY: Record<
 export function PageScreen() {
   const { spaceId, pageId } = useParams<{ spaceId: string; pageId: string }>();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const { reloadTree, spaceName } = useOutletContext<{ reloadTree: () => Promise<void>; spaceName: string }>();
   const [data, setData] = useState<PagePayload | null>(null);
@@ -56,6 +59,8 @@ export function PageScreen() {
   const editorRef = useRef<BlockNoteEditor | null>(null);
   const versionRef = useRef(0);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [publicModal, setPublicModal] = useState<'enable' | 'disable' | null>(null);
+  const [publicBusy, setPublicBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!pageId) return;
@@ -190,20 +195,36 @@ export function PageScreen() {
     setRemountKey((k) => k + 1);
   }
 
-  async function togglePublic(enable: boolean) {
-    if (!pageId) return;
-    const confirm = enable ? window.confirm('Сделать страницу доступной по публичной ссылке?') : true;
-    if (!confirm) return;
-    const res = await apiJson<{ share: { publicUrl?: string; enabled: boolean } }>(
-      `/api/v1/pages/${pageId}/public-share`,
-      { enabled: enable, confirm: true },
-      'POST',
-    );
-    await load();
-    if (res.share.publicUrl) {
-      void navigator.clipboard.writeText(res.share.publicUrl);
+  function requestTogglePublic(enable: boolean) {
+    setPublicModal(enable ? 'enable' : 'disable');
+  }
+
+  async function confirmPublicModal() {
+    if (!pageId || !publicModal) return;
+    const enable = publicModal === 'enable';
+    setPublicBusy(true);
+    try {
+      const res = await apiJson<{ share: { publicUrl?: string; enabled: boolean } }>(
+        `/api/v1/pages/${pageId}/public-share`,
+        { enabled: enable, confirm: true },
+        'POST',
+      );
+      await load();
+      if (res.share.publicUrl) {
+        void navigator.clipboard.writeText(res.share.publicUrl);
+        showToast('Публичная ссылка скопирована в буфер обмена', 'success');
+      } else if (enable) {
+        showToast('Публичный доступ включён', 'success');
+      } else {
+        showToast('Публичная ссылка отключена', 'success');
+      }
+      setRemountKey((k) => k + 1);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Не удалось изменить публичную ссылку', 'error');
+    } finally {
+      setPublicBusy(false);
+      setPublicModal(null);
     }
-    setRemountKey((k) => k + 1);
   }
 
   if (!data) return <p className="muted">Загрузка…</p>;
@@ -289,14 +310,42 @@ export function PageScreen() {
 
       {p.canEdit && (
         <div className="row" style={{ marginBottom: '1rem' }}>
-          <button className="btn" type="button" onClick={() => void togglePublic(true)}>
+          <button className="btn" type="button" onClick={() => requestTogglePublic(true)}>
             Включить публичную ссылку
           </button>
-          <button className="btn" type="button" onClick={() => void togglePublic(false)}>
+          <button className="btn" type="button" onClick={() => requestTogglePublic(false)}>
             Выключить публичную ссылку
           </button>
         </div>
       )}
+
+      <ConfirmModal
+        open={publicModal === 'enable'}
+        title="Включить публичную ссылку?"
+        confirmLabel="Включить доступ"
+        busy={publicBusy}
+        onClose={() => !publicBusy && setPublicModal(null)}
+        onConfirm={confirmPublicModal}
+      >
+        <>
+          По ссылке страницу сможет открыть <strong>любой человек</strong> — без входа в Wiki. Не публикуйте конфиденциальные
+          данные. После включения ссылка будет скопирована в буфер обмена.
+        </>
+      </ConfirmModal>
+      <ConfirmModal
+        open={publicModal === 'disable'}
+        title="Отключить публичную ссылку?"
+        confirmLabel="Отключить"
+        variant="danger"
+        busy={publicBusy}
+        onClose={() => !publicBusy && setPublicModal(null)}
+        onConfirm={confirmPublicModal}
+      >
+        <>
+          Старые ссылки перестанут работать. Участники пространства по-прежнему смогут открыть страницу после{' '}
+          <strong>входа в аккаунт</strong>.
+        </>
+      </ConfirmModal>
 
       <PageVersionsPanel
         pageId={p.id}
